@@ -105,22 +105,9 @@ jobs:
           dockerfile: linux/Dockerfile
           config: .hadolint.yaml
 
-  scan:
-    runs-on: ubuntu-22.04
-    needs: build
-    steps:
-      - name: Trivy scan (report only)
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: ${{ needs.build.outputs.image_tag }}
-          format: 'table'
-          vuln-type: 'os,library'
-          ignore-unfixed: true
-          exit-code: '0'  # never fail the workflow
-
   push:
     runs-on: ubuntu-22.04
-    needs: [build, derive-metadata, test-tools, test-runner, lint, scan]
+    needs: [build, derive-metadata, test-tools, test-runner, lint]
     if: needs.build.outputs.image_tag != ''
     steps:
       - name: Authenticate to GHCR
