@@ -2,7 +2,7 @@
 ARG UBUNTU_VERSION=22.04
 
 FROM ubuntu:${UBUNTU_VERSION} AS runner-downloader
-ARG RUNNER_VERSION=2.323.0
+ARG RUNNER_VERSION=2.322.1
 ARG RUNNER_ARCHIVE=actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq && rm -rf /var/lib/apt/lists/*
@@ -14,7 +14,7 @@ RUN curl -fsSLO "https://github.com/actions/runner/releases/download/v${RUNNER_V
     && mv /opt/actions-runner /opt/actions-runner-${RUNNER_VERSION}
 
 FROM ubuntu:${UBUNTU_VERSION}
-ARG RUNNER_VERSION=2.323.0
+ARG RUNNER_VERSION=2.322.1
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -47,7 +47,7 @@ LABEL org.opencontainers.image.title="golden-runner-linux" \
       org.opencontainers.image.vendor="golden-runners" \
       org.opencontainers.image.source="https://github.com/golden-runners/golden-runners" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="2.323.0" \
+    org.opencontainers.image.version="${RUNNER_VERSION}" \
       org.opencontainers.image.base.name="ubuntu:${UBUNTU_VERSION}"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

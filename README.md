@@ -26,7 +26,7 @@ Enterprise-grade GitHub Actions self-hosted runner images (Linux + Windows) buil
 | Capability | Linux | Windows |
 |------------|-------|---------|
 | Base image | `ubuntu:22.04` | `mcr.microsoft.com/windows/servercore:ltsc2022` |
-| Runner | `actions/runner@2.323.0` pinned w/ sha256 | Same |
+| Runner | `actions/runner@2.322.1` pinned w/ sha256 | Same |
 | Container runtime | Docker CLI 27.1.1 + Buildx 0.15, Compose v2.29 | containerd 1.7.15 + nerdctl 2.0.0 + Docker CLI 27.1.1 |
 | Base tools | Git, curl, jq, Docker CLI 27.1.1 + Buildx 0.15 + Compose v2.29 | Git, Docker CLI 27.1.1 + containerd 1.7.15 + nerdctl 2.0.0 |
 | Security | Non-root `runner` user, HEALTHCHECK (curl + runner process), curated `/etc/sudoers` free | Transcript logging, retryable config, graceful cleanup |
