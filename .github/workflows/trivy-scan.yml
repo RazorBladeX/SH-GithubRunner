@@ -25,7 +25,7 @@ jobs:
         with:
           scan-type: 'fs'
           format: 'template'
-          template: '.github/trivy-consolidated-template.tpl'
+          template: '@.github/trivy-consolidated-template.tpl'
           output: 'trivy-report.md'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           ignore-unfixed: false
