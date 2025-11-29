@@ -21,18 +21,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Trivy filesystem scan
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Linux container image for scanning
+        run: |
+          set -e
+          docker build -f linux/Dockerfile -t runner-linux:scan .
+
+      - name: Run Trivy container image scan
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: 'fs'
+          scan-type: 'image'
+          image-ref: 'runner-linux:scan'
           format: 'template'
           template: '@.github/trivy-consolidated-template.tpl'
           output: 'trivy-report.md'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           ignore-unfixed: false
-          skip-dirs: 'node_modules,.git'
+
+      - name: Upload Trivy scan report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-report
+          path: trivy-report.md
+          retention-days: 30
 
       - name: Create vulnerability issue
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
