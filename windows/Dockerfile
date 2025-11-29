@@ -3,7 +3,7 @@ ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
 
 FROM ${BASE_IMAGE} AS runner-download
 SHELL ["powershell","-Command"]
-ARG RUNNER_VERSION=2.322.1
+ARG RUNNER_VERSION=2.330.0
 RUN $ErrorActionPreference = 'Stop'; `
     Invoke-WebRequest -Uri "https://github.com/actions/runner/releases/download/v$env:RUNNER_VERSION/actions-runner-win-x64-$env:RUNNER_VERSION.zip" -OutFile C:\runner.zip; `
     Invoke-WebRequest -Uri "https://github.com/actions/runner/releases/download/v$env:RUNNER_VERSION/actions-runner-win-x64-$env:RUNNER_VERSION.zip.sha256" -OutFile C:\runner.zip.sha256; `
@@ -14,7 +14,7 @@ RUN $ErrorActionPreference = 'Stop'; `
 
 FROM ${BASE_IMAGE}
 SHELL ["powershell","-Command"]
-ARG RUNNER_VERSION=2.322.1
+ARG RUNNER_VERSION=2.330.0
 ENV RUNNER_ROOT="C:\actions-runner" `
     CONTAINERD_VERSION="1.7.15" `
     NERDCTL_VERSION="2.0.0" `

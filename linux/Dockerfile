@@ -2,7 +2,7 @@
 ARG UBUNTU_VERSION=22.04
 
 FROM ubuntu:${UBUNTU_VERSION} AS runner-downloader
-ARG RUNNER_VERSION=2.322.1
+ARG RUNNER_VERSION=2.330.0
 ARG RUNNER_ARCHIVE=actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq && rm -rf /var/lib/apt/lists/*
@@ -14,7 +14,7 @@ RUN curl -fsSLO "https://github.com/actions/runner/releases/download/v${RUNNER_V
     && mv /opt/actions-runner /opt/actions-runner-${RUNNER_VERSION}
 
 FROM ubuntu:${UBUNTU_VERSION}
-ARG RUNNER_VERSION=2.322.1
+ARG RUNNER_VERSION=2.330.0
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -27,7 +27,9 @@ RUN chmod +x /tmp/tools-install.sh && /tmp/tools-install.sh && rm /tmp/tools-ins
 
 COPY --from=runner-downloader /opt/actions-runner-${RUNNER_VERSION} ${RUNNER_HOME}
 
-RUN cd ${RUNNER_HOME} && ./bin/installdependencies.sh && rm -rf /var/lib/apt/lists/*
+WORKDIR ${RUNNER_HOME}
+
+RUN ./bin/installdependencies.sh && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1001 runner \
     && useradd --uid 1001 --gid runner --shell /bin/bash --create-home runner \
@@ -39,8 +41,6 @@ RUN groupadd --gid 1001 runner \
 COPY linux/entrypoint.sh /entrypoint.sh
 COPY linux/test /opt/tests
 RUN chmod +x /entrypoint.sh /opt/tests/*.sh
-
-WORKDIR ${RUNNER_HOME}
 
 LABEL org.opencontainers.image.title="golden-runner-linux" \
       org.opencontainers.image.description="Hardened GitHub Actions self-hosted runner image for Linux" \
