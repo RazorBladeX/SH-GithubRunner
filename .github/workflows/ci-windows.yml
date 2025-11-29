@@ -126,7 +126,7 @@ jobs:
       DATE_TAG: ${{ needs.build-test-scan.outputs.date_tag }}
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: runner-windows-tar
           path: .
