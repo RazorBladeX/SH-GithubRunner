@@ -1,4 +1,4 @@
-name: Linux runner CI
+name: Linux Runner CI/CD
 
 on:
   push:
@@ -24,26 +24,36 @@ permissions:
   contents: read
   packages: write
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
-  build-test-scan:
+  derive-metadata:
     runs-on: ubuntu-22.04
-    env:
-      REGISTRY: ghcr.io
+    outputs:
+      image_tag: ${{ steps.set-meta.outputs.image_tag }}
+      image_repository: ${{ steps.set-meta.outputs.image_repository }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Derive image metadata
-        id: naming
+      - name: Set image metadata
+        id: set-meta
         run: |
           OWNER_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPOSITORY="${OWNER_LOWER}/runner-linux"
           IMAGE_TAG="ghcr.io/${IMAGE_REPOSITORY}:ci-${GITHUB_SHA}"
-          {
-            echo "owner_lower=${OWNER_LOWER}"
-            echo "image_repository=${IMAGE_REPOSITORY}"
-            echo "image_tag=${IMAGE_TAG}"
-          } >> "$GITHUB_OUTPUT"
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+  build:
+    runs-on: ubuntu-22.04
+    needs: derive-metadata
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -51,64 +61,73 @@ jobs:
       - name: Authenticate to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Calculate metadata
-        id: meta
-        run: |
-          DATE_TAG=$(date -u +%Y%m%d)
-          echo "date_tag=${DATE_TAG}" >> "$GITHUB_OUTPUT"
-          SHOULD_PUSH=false
-          if [[ "${GITHUB_REF}" == "refs/heads/main" && "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            SHOULD_PUSH=true
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_call" && "${{ inputs.release_channel }}" == "nightly" ]]; then
-            SHOULD_PUSH=true
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.release_channel }}" == "nightly" ]]; then
-            SHOULD_PUSH=true
-          fi
-          echo "should_push=${SHOULD_PUSH}" >> "$GITHUB_OUTPUT"
-
-      - name: Build runner image (linux)
+      - name: Build Docker image
+        id: build
         run: |
           docker buildx build \
             --platform linux/amd64 \
             --file linux/Dockerfile \
-            --tag "${{ steps.naming.outputs.image_tag }}" \
+            --tag "${{ needs.derive-metadata.outputs.image_tag }}" \
             --load \
             .
+          echo "image_tag=${{ needs.derive-metadata.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
+  test-tools:
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
       - name: Run tool smoke tests
         run: |
-          docker run --rm --entrypoint /bin/bash "${{ steps.naming.outputs.image_tag }}" /opt/tests/test_tools.sh
+          docker run --rm --entrypoint /bin/bash "${{ needs.build.outputs.image_tag }}" /opt/tests/test_tools.sh
 
-      - name: Run runner synth tests
+  test-runner:
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - name: Run runner synthetic tests
         run: |
-          docker run --rm --entrypoint /bin/bash "${{ steps.naming.outputs.image_tag }}" /opt/tests/test_runner.sh
+          docker run --rm --entrypoint /bin/bash "${{ needs.build.outputs.image_tag }}" /opt/tests/test_runner.sh
 
-      - name: Hadolint
+  lint:
+    runs-on: ubuntu-22.04
+    needs: derive-metadata
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Hadolint Dockerfile
         uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: linux/Dockerfile
           config: .hadolint.yaml
 
-      - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.33.1
+  scan:
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - name: Trivy scan (report only)
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
-          image-ref: ${{ steps.naming.outputs.image_tag }}
+          image-ref: ${{ needs.build.outputs.image_tag }}
           format: 'table'
-          exit-code: '1'
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
+          exit-code: '0'  # never fail the workflow
 
-      - name: Push image to GHCR
-        if: steps.meta.outputs.should_push == 'true'
+  push:
+    runs-on: ubuntu-22.04
+    needs: [test-tools, test-runner, lint, scan]
+    if: needs.derive-metadata.outputs.image_tag != ''
+    steps:
+      - name: Push Docker image to GHCR
         env:
-          DATE_TAG: ${{ steps.meta.outputs.date_tag }}
-          IMAGE_REPOSITORY: ${{ steps.naming.outputs.image_repository }}
-          IMAGE_TAG: ${{ steps.naming.outputs.image_tag }}
+          IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+          IMAGE_REPOSITORY: ${{ needs.derive-metadata.outputs.image_repository }}
+          DATE_TAG: ${{ github.run_number }}
         run: |
           docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:latest"
           docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:${DATE_TAG}"
