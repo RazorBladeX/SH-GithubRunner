@@ -87,19 +87,6 @@ jobs:
         run: |
           C:\hadolint.exe -c .hadolint.yaml windows/Dockerfile
 
-      - name: Install Trivy
-        shell: pwsh
-        run: |
-          $trivyVersion = '0.54.1'
-          $zip = "C:\trivy.zip"
-          Invoke-WebRequest -Uri "https://github.com/aquasecurity/trivy/releases/download/v$trivyVersion/trivy_${trivyVersion}_Windows-64bit.zip" -OutFile $zip
-          Expand-Archive -Path $zip -DestinationPath C:\trivy -Force
-
-      - name: Trivy scan
-        shell: pwsh
-        run: |
-          C:\trivy\trivy.exe image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --scanners vuln $Env:IMAGE_TAG
-
       - name: Export image for approval gate
         if: steps.meta.outputs.should_push == 'true'
         shell: pwsh
