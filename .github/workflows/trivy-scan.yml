@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'fs'
           format: 'template'
@@ -34,17 +34,17 @@ jobs:
       - name: Create or update consolidated vulnerability issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: "Security Vulnerabilities in Dependencies (Trivy Scan)"
         run: |
-          TITLE="Security Vulnerabilities in Dependencies (Trivy Scan)"
-
           # Look for existing open issue with this exact title
-          EXISTING=$(gh issue list --state open --label "security-scan" --json number,title --jq '.[] | select(.title == "'"$TITLE"'") | .number' | head -n1)
+          EXISTING=$(gh issue list --state open --label "security-scan" --search "in:title $ISSUE_TITLE" --json number,title | jq -r --arg title "$ISSUE_TITLE" '.[] | select(.title == $title) | .number' | head -n1)
 
-          if [ -s trivy-report.md ] && grep -q -v "No vulnerabilities found" trivy-report.md; then
+          # Check if report contains actual vulnerabilities (not just "No vulnerabilities detected")
+          if [ -s trivy-report.md ] && ! grep -q "No vulnerabilities detected" trivy-report.md; then
             if [ -z "$EXISTING" ]; then
               echo "Creating new consolidated issue"
               gh issue create \
-                --title "$TITLE" \
+                --title "$ISSUE_TITLE" \
                 --body-file trivy-report.md \
                 --label "security","vulnerability","automated","security-scan"
             else
