@@ -4,7 +4,9 @@
 
 {{- $vulnCount := 0 -}}
 {{- range . -}}
-  {{- $vulnCount = add $vulnCount (len .Vulnerabilities) -}}
+  {{- if .Vulnerabilities -}}
+    {{- $vulnCount = add $vulnCount (len .Vulnerabilities) -}}
+  {{- end -}}
 {{- end }}
 
 **Total vulnerabilities found:** {{ $vulnCount }}
@@ -18,6 +20,9 @@
 {{- if .Vulnerabilities }}
 
 ### Target: `{{ .Target }}`
+{{- if .Type }}
+**Type:** {{ .Type }}
+{{- end }}
 
 {{- range .Vulnerabilities }}
 
