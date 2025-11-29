@@ -54,5 +54,7 @@ jobs:
             fi
           else
             echo "No vulnerabilities found – closing issue if exists"
-            [ -n "$EXISTING" ] && gh issue close "$EXISTING" -c "No vulnerabilities detected in latest scan"
+            if [ -n "$EXISTING" ]; then
+              gh issue close "$EXISTING" -c "No vulnerabilities detected in latest scan"
+            fi
           fi
