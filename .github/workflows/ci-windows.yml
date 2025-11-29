@@ -36,7 +36,7 @@ jobs:
       IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/runner-windows:ci-${{ github.sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload image artifact
         if: steps.meta.outputs.should_push == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: runner-windows-tar
           path: runner-windows.tar
@@ -126,7 +126,7 @@ jobs:
       DATE_TAG: ${{ needs.build-test-scan.outputs.date_tag }}
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: runner-windows-tar
           path: .

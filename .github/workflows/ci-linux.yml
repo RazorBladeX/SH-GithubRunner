@@ -31,7 +31,7 @@ jobs:
       REGISTRY: ghcr.io
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Derive image metadata
         id: naming
@@ -88,13 +88,13 @@ jobs:
           docker run --rm --entrypoint /bin/bash "${{ steps.naming.outputs.image_tag }}" /opt/tests/test_runner.sh
 
       - name: Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: linux/Dockerfile
           config: .hadolint.yaml
 
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ steps.naming.outputs.image_tag }}
           format: 'table'
