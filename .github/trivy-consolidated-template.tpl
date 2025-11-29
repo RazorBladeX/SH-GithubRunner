@@ -3,7 +3,7 @@
 **Scan date:** {{ now | date "2006-01-02 15:04 UTC" }}
 
 {{- $vulnCount := 0 -}}
-{{- range .Results -}}
+{{- range . -}}
   {{- if .Vulnerabilities -}}
     {{- $vulnCount = add $vulnCount (len .Vulnerabilities) -}}
   {{- end -}}
@@ -16,7 +16,7 @@
 **No vulnerabilities detected. Great job!**
 
 {{- else }}
-{{- range .Results }}
+{{- range . }}
 {{- if .Vulnerabilities }}
 
 ### Target: `{{ .Target }}`
