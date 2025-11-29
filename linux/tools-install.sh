@@ -85,16 +85,19 @@ install_docker_cli() {
     install -m 0755 "/tmp/docker/${bin}" "${INSTALL_DIR}/${bin}"
   done
   install -m 0755 /tmp/docker/runc "${INSTALL_DIR}/runc"
+  rm -rf /tmp/docker.tgz /tmp/docker
   
   echo "Downloading Docker Buildx ${BUILDX_VERSION}..."
   curl -fsSL "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-amd64" -o /tmp/docker-buildx
   verify_checksum /tmp/docker-buildx "${BUILDX_SHA256}"
   install -m 0755 /tmp/docker-buildx "${DOCKER_PLUGIN_DIR}/docker-buildx"
+  rm -f /tmp/docker-buildx
   
   echo "Downloading Docker Compose ${COMPOSE_VERSION}..."
   curl -fsSL "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /tmp/docker-compose
   verify_checksum /tmp/docker-compose "${COMPOSE_SHA256}"
   install -m 0755 /tmp/docker-compose "${DOCKER_PLUGIN_DIR}/docker-compose"
+  rm -f /tmp/docker-compose
 }
 
 finalize() {
