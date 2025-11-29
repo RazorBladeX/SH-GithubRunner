@@ -1,0 +1,41 @@
+name: Cleanup old GHCR tags
+
+on:
+  schedule:
+    - cron: '0 5 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Remove versions older than 30 days
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d '30 days ago' +%s)
+          scope="users/${OWNER}"
+          if gh api "orgs/${OWNER}" >/dev/null 2>&1; then
+            scope="orgs/${OWNER}"
+          fi
+          packages=(runner-linux runner-windows)
+          for package in "${packages[@]}"; do
+            echo "Scanning ${package} for stale tags"
+            gh api "/${scope}/packages/container/${package}/versions?per_page=100" --paginate |
+              jq -r --argjson cutoff "$cutoff" '.[] | {id: .id, tags: (.metadata.container.tags // []), updated: (.updated_at // .created_at)} |
+                select(((.updated | fromdateiso8601) // 0) < $cutoff) |
+                select(([.tags[]?] | index("latest")) | not) |
+                .id' |
+              while read -r version_id; do
+                if [[ -n "$version_id" ]]; then
+                  echo "Deleting version ${version_id} in ${package}"
+                  gh api -X DELETE "/${scope}/packages/container/${package}/versions/${version_id}" >/dev/null
+                fi
+              done
+          done

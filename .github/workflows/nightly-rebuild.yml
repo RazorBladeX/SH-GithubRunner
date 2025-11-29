@@ -1,0 +1,21 @@
+name: Nightly rebuild
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  linux:
+    uses: ./.github/workflows/ci-linux.yml
+    with:
+      release_channel: nightly
+
+  windows:
+    uses: ./.github/workflows/ci-windows.yml
+    with:
+      release_channel: nightly

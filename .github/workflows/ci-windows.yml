@@ -1,0 +1,152 @@
+name: Windows runner CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_channel:
+        description: 'Override release channel (use nightly to force push)'
+        required: false
+        default: 'adhoc'
+  workflow_call:
+    inputs:
+      release_channel:
+        description: 'Channel identifier (nightly triggers push)'
+        required: false
+        default: 'adhoc'
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-test-scan:
+    runs-on: windows-2022
+    outputs:
+      should_push: ${{ steps.meta.outputs.should_push }}
+      date_tag: ${{ steps.meta.outputs.date_tag }}
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_REPOSITORY: ${{ github.repository_owner }}/runner-windows
+      IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/runner-windows:ci-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $dateTag = (Get-Date -Format 'yyyyMMdd')
+          "date_tag=$dateTag" >> $Env:GITHUB_OUTPUT
+          $shouldPush = $false
+          if ($Env:GITHUB_REF -eq 'refs/heads/main' -and $Env:GITHUB_EVENT_NAME -eq 'push') {
+            $shouldPush = $true
+          } elseif ($Env:GITHUB_EVENT_NAME -eq 'workflow_call' -and '${{ inputs.release_channel }}' -eq 'nightly') {
+            $shouldPush = $true
+          } elseif ($Env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and '${{ github.event.inputs.release_channel }}' -eq 'nightly') {
+            $shouldPush = $true
+          }
+          "should_push=$shouldPush" >> $Env:GITHUB_OUTPUT
+
+      - name: Build runner image (windows)
+        shell: pwsh
+        run: |
+          docker build --file windows/Dockerfile --tag $Env:IMAGE_TAG .
+
+      - name: Run tool smoke tests
+        shell: pwsh
+        run: |
+          docker run --rm --entrypoint pwsh $Env:IMAGE_TAG -File C:\tests\Test-Tools.ps1
+
+      - name: Run runner synth tests
+        shell: pwsh
+        run: |
+          docker run --rm --entrypoint pwsh $Env:IMAGE_TAG -File C:\tests\Test-Runner.ps1
+
+      - name: Install hadolint
+        shell: pwsh
+        run: |
+          $hadolintUrl = 'https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Windows-x86_64.exe'
+          Invoke-WebRequest -Uri $hadolintUrl -OutFile C:\hadolint.exe
+
+      - name: Lint Dockerfile
+        shell: pwsh
+        run: |
+          C:\hadolint.exe -c .hadolint.yaml windows/Dockerfile
+
+      - name: Install Trivy
+        shell: pwsh
+        run: |
+          $trivyVersion = '0.54.1'
+          $zip = "C:\trivy.zip"
+          Invoke-WebRequest -Uri "https://github.com/aquasecurity/trivy/releases/download/v$trivyVersion/trivy_${trivyVersion}_Windows-64bit.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath C:\trivy -Force
+
+      - name: Trivy scan
+        shell: pwsh
+        run: |
+          C:\trivy\trivy.exe image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --scanners vuln $Env:IMAGE_TAG
+
+      - name: Export image for approval gate
+        if: steps.meta.outputs.should_push == 'true'
+        shell: pwsh
+        run: |
+          docker save $Env:IMAGE_TAG --output runner-windows.tar
+
+      - name: Upload image artifact
+        if: steps.meta.outputs.should_push == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: runner-windows-tar
+          path: runner-windows.tar
+          retention-days: 1
+
+  publish:
+    needs: build-test-scan
+    if: needs.build-test-scan.outputs.should_push == 'true'
+    runs-on: windows-2022
+    environment: windows-production
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_REPOSITORY: ${{ github.repository_owner }}/runner-windows
+      BASE_IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/runner-windows:ci-${{ github.sha }}
+      DATE_TAG: ${{ needs.build-test-scan.outputs.date_tag }}
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: runner-windows-tar
+          path: .
+
+      - name: Load image
+        shell: pwsh
+        run: |
+          docker load --input runner-windows.tar
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push release tags
+        shell: pwsh
+        run: |
+          docker tag $Env:BASE_IMAGE_TAG "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:latest"
+          docker tag $Env:BASE_IMAGE_TAG "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:${Env:DATE_TAG}"
+          docker push "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:latest"
+          docker push "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:${Env:DATE_TAG}"

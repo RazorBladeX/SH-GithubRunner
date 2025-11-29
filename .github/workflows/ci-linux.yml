@@ -1,0 +1,104 @@
+name: Linux runner CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_channel:
+        description: 'Override release channel (use nightly to force push)'
+        required: false
+        default: 'adhoc'
+  workflow_call:
+    inputs:
+      release_channel:
+        description: 'Channel identifier (nightly triggers push)'
+        required: false
+        default: 'adhoc'
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-test-scan:
+    runs-on: ubuntu-22.04
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_REPOSITORY: ${{ github.repository_owner }}/runner-linux
+      IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/runner-linux:ci-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculate metadata
+        id: meta
+        run: |
+          DATE_TAG=$(date -u +%Y%m%d)
+          echo "date_tag=${DATE_TAG}" >> "$GITHUB_OUTPUT"
+          SHOULD_PUSH=false
+          if [[ "${GITHUB_REF}" == "refs/heads/main" && "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            SHOULD_PUSH=true
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_call" && "${{ inputs.release_channel }}" == "nightly" ]]; then
+            SHOULD_PUSH=true
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.release_channel }}" == "nightly" ]]; then
+            SHOULD_PUSH=true
+          fi
+          echo "should_push=${SHOULD_PUSH}" >> "$GITHUB_OUTPUT"
+
+      - name: Build runner image (linux)
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --file linux/Dockerfile \
+            --tag "$IMAGE_TAG" \
+            --load \
+            .
+
+      - name: Run tool smoke tests
+        run: |
+          docker run --rm --entrypoint /bin/bash "$IMAGE_TAG" /opt/tests/test_tools.sh
+
+      - name: Run runner synth tests
+        run: |
+          docker run --rm --entrypoint /bin/bash "$IMAGE_TAG" /opt/tests/test_runner.sh
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: linux/Dockerfile
+          config: .hadolint.yaml
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: 'table'
+          exit-code: '1'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Push image to GHCR
+        if: steps.meta.outputs.should_push == 'true'
+        env:
+          DATE_TAG: ${{ steps.meta.outputs.date_tag }}
+        run: |
+          docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:latest"
+          docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:${DATE_TAG}"
+          docker push "${REGISTRY}/${IMAGE_REPOSITORY}:latest"
+          docker push "${REGISTRY}/${IMAGE_REPOSITORY}:${DATE_TAG}"

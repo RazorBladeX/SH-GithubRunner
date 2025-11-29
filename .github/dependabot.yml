@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "03:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "docker"
+    directory: "/linux"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "04:00"
+      timezone: "UTC"
+  - package-ecosystem: "docker"
+    directory: "/windows"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "05:00"
+      timezone: "UTC"
+  - package-ecosystem: "terraform"
+    directory: "/terraform"
+    schedule:
+      interval: "monthly"
+    ignore:
+      - dependency-name: "hashicorp/aws"
+        versions: ["< 5.0"]
