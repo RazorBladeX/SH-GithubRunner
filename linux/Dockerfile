@@ -15,9 +15,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 COPY linux/tools-install.sh /tmp/tools-install.sh
-RUN chmod +x /tmp/tools-install.sh && /tmp/tools-install.sh && rm /tmp/tools-install.sh
+RUN chmod +x /tmp/tools-install.sh && /tmp/tools-install.sh
 
-COPY --from=runner-source /home/runner/actions-runner ${RUNNER_HOME}
+COPY --from=runner-source /home/runner ${RUNNER_HOME}
 
 WORKDIR ${RUNNER_HOME}
 

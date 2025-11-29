@@ -72,7 +72,7 @@ jobs:
             --platform linux/amd64 \
             --file linux/Dockerfile \
             --tag "${{ needs.derive-metadata.outputs.image_tag }}" \
-            --load \
+            --push \
             .
           echo "image_tag=${{ needs.derive-metadata.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
 
@@ -110,7 +110,7 @@ jobs:
     needs: build
     steps:
       - name: Trivy scan (report only)
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ needs.build.outputs.image_tag }}
           format: 'table'
@@ -120,15 +120,23 @@ jobs:
 
   push:
     runs-on: ubuntu-22.04
-    needs: [test-tools, test-runner, lint, scan]
-    if: needs.derive-metadata.outputs.image_tag != ''
+    needs: [build, derive-metadata, test-tools, test-runner, lint, scan]
+    if: needs.build.outputs.image_tag != ''
     steps:
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Push Docker image to GHCR
         env:
           IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
           IMAGE_REPOSITORY: ${{ needs.derive-metadata.outputs.image_repository }}
           DATE_TAG: ${{ github.run_number }}
         run: |
+          docker pull "$IMAGE_TAG"
           docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:latest"
           docker tag "$IMAGE_TAG" "${REGISTRY}/${IMAGE_REPOSITORY}:${DATE_TAG}"
           docker push "${REGISTRY}/${IMAGE_REPOSITORY}:latest"
