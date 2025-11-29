@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload image artifact
         if: steps.meta.outputs.should_push == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: runner-windows-tar
           path: runner-windows.tar
