@@ -1,17 +1,9 @@
 # syntax=docker/dockerfile:1.7
 ARG UBUNTU_VERSION=22.04
-
-FROM ubuntu:${UBUNTU_VERSION} AS runner-downloader
 ARG RUNNER_VERSION=2.330.0
-ARG RUNNER_ARCHIVE=actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq && rm -rf /var/lib/apt/lists/*
-WORKDIR /tmp/runner
-RUN curl -fsSLO "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}" \
-    && curl -fsSLO "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}.sha256" \
-    && sha256sum -c "${RUNNER_ARCHIVE}.sha256" \
-    && tar -xzf "${RUNNER_ARCHIVE}" -C /opt \
-    && mv /opt/actions-runner /opt/actions-runner-${RUNNER_VERSION}
+ARG RUNNER_BASE_IMAGE=ghcr.io/actions/actions-runner:${RUNNER_VERSION}
+
+FROM ${RUNNER_BASE_IMAGE} AS runner-source
 
 FROM ubuntu:${UBUNTU_VERSION}
 ARG RUNNER_VERSION=2.330.0
@@ -25,7 +17,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 COPY linux/tools-install.sh /tmp/tools-install.sh
 RUN chmod +x /tmp/tools-install.sh && /tmp/tools-install.sh && rm /tmp/tools-install.sh
 
-COPY --from=runner-downloader /opt/actions-runner-${RUNNER_VERSION} ${RUNNER_HOME}
+COPY --from=runner-source /home/runner/actions-runner ${RUNNER_HOME}
 
 WORKDIR ${RUNNER_HOME}
 
