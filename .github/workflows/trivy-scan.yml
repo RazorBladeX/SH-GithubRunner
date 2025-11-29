@@ -32,29 +32,21 @@ jobs:
           ignore-unfixed: false
           skip-dirs: 'node_modules,.git'
 
-      - name: Create or update consolidated vulnerability issue
+      - name: Create vulnerability issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_TITLE: "Security Vulnerabilities in Dependencies (Trivy Scan)"
         run: |
-          # Look for existing open issue with this exact title
-          EXISTING=$(gh issue list --state open --label "security-scan" --search "in:title $ISSUE_TITLE" --json number,title | jq -r --arg title "$ISSUE_TITLE" '.[] | select(.title == $title) | .number' | head -n1)
+          # Generate datetime for title (DD-MM-YY @ HH:MM)
+          DATETIME=$(date -u +"%d-%m-%y @ %H:%M")
+          ISSUE_TITLE="Security Vulnerabilities (Trivy Scan) - ${DATETIME}"
 
-          # Check if report contains actual vulnerabilities (not just "No vulnerabilities detected")
+          # Only create issue if there are vulnerabilities
           if [ -s trivy-report.md ] && ! grep -q "No vulnerabilities detected" trivy-report.md; then
-            if [ -z "$EXISTING" ]; then
-              echo "Creating new consolidated issue"
-              gh issue create \
-                --title "$ISSUE_TITLE" \
-                --body-file trivy-report.md \
-                --label "security","vulnerability","automated","security-scan"
-            else
-              echo "Updating existing issue #$EXISTING"
-              gh issue edit "$EXISTING" --body-file trivy-report.md
-            fi
+            echo "Creating new issue with title: $ISSUE_TITLE"
+            gh issue create \
+              --title "$ISSUE_TITLE" \
+              --body-file trivy-report.md \
+              --label "security","vulnerability","automated","security-scan"
           else
-            echo "No vulnerabilities found – closing issue if exists"
-            if [ -n "$EXISTING" ]; then
-              gh issue close "$EXISTING" -c "No vulnerabilities detected in latest scan"
-            fi
+            echo "No vulnerabilities found - skipping issue creation"
           fi
