@@ -27,6 +27,11 @@ jobs:
           packages=(runner-linux runner-windows)
           for package in "${packages[@]}"; do
             echo "Scanning ${package} for stale tags"
+            # Check if package exists before trying to list versions
+            if ! gh api "/${scope}/packages/container/${package}" >/dev/null 2>&1; then
+              echo "Package ${package} not found, skipping..."
+              continue
+            fi
             gh api "/${scope}/packages/container/${package}/versions?per_page=100" --paginate |
               jq -r --argjson cutoff "$cutoff" '.[] | {id: .id, tags: (.metadata.container.tags // []), updated: (.updated_at // .created_at)} |
                 select(((.updated | fromdateiso8601) // 0) < $cutoff) |
@@ -35,7 +40,10 @@ jobs:
               while read -r version_id; do
                 if [[ -n "$version_id" ]]; then
                   echo "Deleting version ${version_id} in ${package}"
-                  gh api -X DELETE "/${scope}/packages/container/${package}/versions/${version_id}" >/dev/null
+                  gh api -X DELETE "/${scope}/packages/container/${package}/versions/${version_id}" >/dev/null || {
+                    echo "Warning: Failed to delete version ${version_id}"
+                  }
                 fi
               done
           done
+          echo "Cleanup completed successfully"

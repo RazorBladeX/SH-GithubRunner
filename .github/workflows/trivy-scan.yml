@@ -26,11 +26,11 @@ jobs:
 
       - name: Build Linux container image for scanning
         run: |
-          set -e
+          set -euo pipefail
           docker build -f linux/Dockerfile -t runner-linux:scan .
 
       - name: Run Trivy container image scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           scan-type: 'image'
           image-ref: 'runner-linux:scan'
@@ -54,6 +54,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
+          set -euo pipefail
           # Generate datetime for title (DD-MM-YY @ HH:MM)
           DATETIME=$(date -u +"%d-%m-%y @ %H:%M")
           ISSUE_TITLE="Security Vulnerabilities (Trivy Scan) - ${DATETIME}"

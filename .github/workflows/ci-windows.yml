@@ -23,10 +23,27 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install hadolint
+        run: |
+          sudo wget -qO /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          sudo chmod +x /usr/local/bin/hadolint
+
+      - name: Lint Windows Dockerfile
+        run: |
+          hadolint -c .hadolint.yaml windows/Dockerfile
+
   build-test-scan:
     runs-on: windows-2022
+    needs: lint
     outputs:
       should_push: ${{ steps.meta.outputs.should_push }}
       date_tag: ${{ steps.meta.outputs.date_tag }}
@@ -36,7 +53,7 @@ jobs:
       IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/runner-windows:ci-${{ github.sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -49,6 +66,7 @@ jobs:
         id: meta
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $dateTag = (Get-Date -Format 'yyyyMMdd')
           "date_tag=$dateTag" >> $Env:GITHUB_OUTPUT
           $shouldPush = $false
@@ -64,38 +82,31 @@ jobs:
       - name: Build runner image (windows)
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker build --file windows/Dockerfile --tag $Env:IMAGE_TAG .
 
       - name: Run tool smoke tests
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker run --rm --entrypoint pwsh $Env:IMAGE_TAG -File C:\tests\Test-Tools.ps1
 
       - name: Run runner synth tests
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker run --rm --entrypoint pwsh $Env:IMAGE_TAG -File C:\tests\Test-Runner.ps1
-
-      - name: Install hadolint
-        shell: pwsh
-        run: |
-          $hadolintUrl = 'https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Windows-x86_64.exe'
-          Invoke-WebRequest -Uri $hadolintUrl -OutFile C:\hadolint.exe
-
-      - name: Lint Dockerfile
-        shell: pwsh
-        run: |
-          C:\hadolint.exe -c .hadolint.yaml windows/Dockerfile
 
       - name: Export image for approval gate
         if: steps.meta.outputs.should_push == 'true'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker save $Env:IMAGE_TAG --output runner-windows.tar
 
       - name: Upload image artifact
         if: steps.meta.outputs.should_push == 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: runner-windows-tar
           path: runner-windows.tar
@@ -113,7 +124,7 @@ jobs:
       DATE_TAG: ${{ needs.build-test-scan.outputs.date_tag }}
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v4
         with:
           name: runner-windows-tar
           path: .
@@ -121,6 +132,7 @@ jobs:
       - name: Load image
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker load --input runner-windows.tar
 
       - name: Log in to GHCR
@@ -133,6 +145,7 @@ jobs:
       - name: Push release tags
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           docker tag $Env:BASE_IMAGE_TAG "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:latest"
           docker tag $Env:BASE_IMAGE_TAG "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:${Env:DATE_TAG}"
           docker push "${Env:REGISTRY}/${Env:IMAGE_REPOSITORY}:latest"

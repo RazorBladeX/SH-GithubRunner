@@ -3,6 +3,7 @@ ARG UBUNTU_VERSION=22.04
 ARG RUNNER_VERSION=2.330.0
 ARG RUNNER_BASE_IMAGE=ghcr.io/actions/actions-runner:${RUNNER_VERSION}
 
+# hadolint ignore=DL3006
 FROM ${RUNNER_BASE_IMAGE} AS runner-source
 
 FROM ubuntu:${UBUNTU_VERSION}

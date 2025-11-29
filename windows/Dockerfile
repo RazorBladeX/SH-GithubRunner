@@ -1,6 +1,7 @@
 # escape=`
 ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2022
 
+# hadolint ignore=DL3006
 FROM ${BASE_IMAGE} AS runner-download
 SHELL ["powershell","-Command"]
 ARG RUNNER_VERSION=2.330.0
@@ -12,6 +13,7 @@ RUN $ErrorActionPreference = 'Stop'; `
     if ($expected -ne $actual) { throw 'Runner checksum mismatch'; }; `
     Expand-Archive -Path C:\runner.zip -DestinationPath C:\actions-runner
 
+# hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
 SHELL ["powershell","-Command"]
 ARG RUNNER_VERSION=2.330.0

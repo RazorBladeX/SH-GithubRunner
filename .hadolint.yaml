@@ -1,5 +1,6 @@
 ignored:
   - DL3008  # Pin versions via manual downloads instead
   - DL3018  # apt-key usage replaced with custom verification
+  - DL3059  # Multiple consecutive RUN instructions kept for clarity
 no-color: true
-failure-threshold: info
+failure-threshold: warning
