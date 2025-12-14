@@ -41,7 +41,7 @@ jobs:
           ignore-unfixed: false
 
       - name: Upload Trivy scan report as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: trivy-scan-report
           path: trivy-report.md
